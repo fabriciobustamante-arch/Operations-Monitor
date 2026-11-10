@@ -603,6 +603,11 @@ function vigWeek(w) {
       for (const [c, x] of Object.entries(R.cen)) { (o.cenB[c] || (o.cenB[c] = Array(n).fill(0)))[i] = x.pso[s] || 0; if (!o.cen[c]) o.cen[c] = A(); if (cov) o.cen[c][i] = x.rdo[s] ?? 0; }
       for (const c of Object.keys(o.cenB)) if (!R.cen[c]) { if (R.baseLabel === "PDO") o.cenB[c][i] = 0; if (cov) { if (!o.cen[c]) o.cen[c] = A(); o.cen[c][i] = 0; } }
     }
+    // antes del primer reprograma del día rige el programa base (PDO o PSO): se muestra para que no quede un hueco
+    const s0 = Number.isFinite(R.firstSlot) ? R.firstSlot : 0;
+    for (let s = 0; s < s0; s++) { const i = d * 48 + s;
+      BARRAS.forEach(b => { o.cmg[b.k][i] = o.cmgB[b.k][i]; }); o.re[i] = o.reB[i]; o.resid[i] = o.residB[i];
+      for (const c of Object.keys(o.cenB)) { if (!o.cen[c]) o.cen[c] = A(); o.cen[c][i] = o.cenB[c][i]; } }
   });
   return o;
 }
