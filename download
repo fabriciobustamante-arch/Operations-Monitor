@@ -1,0 +1,6 @@
+raw/
+cache/
+_site/
+data/boot.json
+data/estado.json
+__pycache__/

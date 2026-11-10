@@ -1,0 +1,87 @@
+name: Actualizar monitor
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"     # cada 30 minutos (UTC; Lima = UTC-5)
+  workflow_dispatch:            # botón "Run workflow" para correrlo a mano
+  push:
+    branches: [main]
+    paths: ["index.html", "app.js", "data/maestro.json", "scripts/**", ".github/workflows/actualizar.yml"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: actualizar
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      publicar: ${{ steps.cambios.outputs.publicar }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Recuperar descargas anteriores
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            raw
+            cache
+          key: coes-${{ github.run_id }}
+          restore-keys: coes-
+
+      - run: pip install -r requirements.txt
+
+      - name: Descargar lo nuevo del COES
+        run: python scripts/coes.py
+
+      - name: ¿Hay que publicar?
+        id: cambios
+        run: |
+          if [ "$(cat raw/hay_cambios)" = "1" ] || [ "${{ github.event_name }}" != "schedule" ]; then echo "publicar=1" >> "$GITHUB_OUTPUT"; else echo "Sin novedades en el COES"; fi
+
+      - name: Procesar archivos
+        if: steps.cambios.outputs.publicar == '1'
+        run: python scripts/procesar.py
+
+      - name: Armar la página
+        if: steps.cambios.outputs.publicar == '1'
+        run: |
+          mkdir -p _site/data
+          cp index.html app.js _site/
+          cp data/boot.json data/estado.json _site/data/
+
+      - uses: actions/upload-pages-artifact@v4
+        if: steps.cambios.outputs.publicar == '1'
+        with:
+          path: _site
+
+      - name: Guardar descargas
+        if: always() && steps.cambios.outputs.publicar == '1'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            raw
+            cache
+          key: coes-${{ github.run_id }}
+
+  publicar:
+    needs: actualizar
+    if: needs.actualizar.outputs.publicar == '1'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
